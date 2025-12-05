@@ -173,20 +173,32 @@
   function extractProfileInfo(obj, result = {}) {
     if (!obj || typeof obj !== 'object') return result;
 
+    // Initialize counters for position-based parsing
+    if (result._labelCount === undefined) {
+      result._labelCount = 0;
+      result._valueCount = 0;
+    }
+
     if (obj['bk.components.Text']) {
       const textComp = obj['bk.components.Text'];
       const text = textComp.text;
       const style = textComp.text_style;
 
       if (style === 'semibold' && text) {
-        result._lastLabel = text;
-      } else if (style === 'normal' && text && result._lastLabel) {
-        const label = result._lastLabel.toLowerCase();
-        if (label === 'joined') {
+        // This is a label (e.g., "名稱", "已加入", "所在地點", or English equivalents)
+        result._labelCount++;
+        result._lastLabelIndex = result._labelCount;
+      } else if (style === 'normal' && text && result._lastLabelIndex) {
+        // This is a value - use position to determine what it is
+        // Position 1: Name (skip, we get this from RichText)
+        // Position 2: Joined date (after "已加入" / "Joined" label)
+        // Position 3: Location (after "所在地點" / "Based in" label)
+        if (result._lastLabelIndex === 2 && !result.joined) {
           result.joined = text;
-        } else if (label === 'based in') {
+        } else if (result._lastLabelIndex === 3 && !result.location) {
           result.location = text;
         }
+        result._lastLabelIndex = null; // Reset after capturing value
       }
     }
 
@@ -340,7 +352,9 @@
         logResponse('FETCH', url, text);
         const profileInfo = parseProfileResponse(text);
         if (profileInfo && profileInfo.username) {
-          delete profileInfo._lastLabel;
+          delete profileInfo._lastLabelIndex;
+          delete profileInfo._labelCount;
+          delete profileInfo._valueCount;
           console.log('[Threads Extractor] Extracted profile info:', profileInfo);
           window.dispatchEvent(new CustomEvent('threads-profile-extracted', { detail: profileInfo }));
         }
@@ -427,7 +441,9 @@
           logResponse('XHR', xhrUrl, this.responseText);
           const profileInfo = parseProfileResponse(this.responseText);
           if (profileInfo && profileInfo.username) {
-            delete profileInfo._lastLabel;
+            delete profileInfo._lastLabelIndex;
+            delete profileInfo._labelCount;
+            delete profileInfo._valueCount;
             console.log('[Threads Extractor] Extracted profile info (XHR):', profileInfo);
             window.dispatchEvent(new CustomEvent('threads-profile-extracted', { detail: profileInfo }));
           }
@@ -513,7 +529,9 @@
       }
 
       if (profileInfo && (profileInfo.username || profileInfo.joined || profileInfo.location)) {
-        delete profileInfo._lastLabel;
+        delete profileInfo._lastLabelIndex;
+        delete profileInfo._labelCount;
+        delete profileInfo._valueCount;
         // If still no username, mark it with the user ID
         if (!profileInfo.username) {
           profileInfo.username = `user_${targetUserId}`;
