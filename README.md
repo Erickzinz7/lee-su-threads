@@ -25,7 +25,10 @@
 
 ## 安裝方式
 
-> ⏳ **Chrome Web Store 審核中**，若對以下操作不熟悉，建議等待 Chrome Web Store 版本上架。
+**推薦：** 前往 [Chrome Web Store](https://chromewebstore.google.com/detail/lee-su-threads/cciaoflecmmomchcjndagcnfpdaanhol)，點擊「**加到 Chrome**」按鈕即可安裝，日後可自動獲得更新。
+
+<details>
+<summary>手動安裝（開發者）</summary>
 
 1. 前往 [Releases 頁面](https://github.com/meettomorrow/lee-su-threads/releases) 下載最新版本的 ZIP 檔
 2. 解壓縮 ZIP 檔
@@ -34,6 +37,8 @@
 5. 點擊「**載入未封裝項目**」
 6. 選擇解壓縮後的資料夾
 7. 擴充功能圖示會出現在工具列
+
+</details>
 
 ## 使用方式
 
@@ -72,7 +77,10 @@ A Chrome extension that automatically displays location info for Threads post au
 
 ### Installation
 
-> ⏳ **Pending Chrome Web Store review.** If you're not familiar with the steps below, please wait for the Chrome Web Store version.
+**Recommended:** Go to [Chrome Web Store](https://chromewebstore.google.com/detail/lee-su-threads/cciaoflecmmomchcjndagcnfpdaanhol) and click "**Add to Chrome**" for easy installation and automatic updates.
+
+<details>
+<summary>Manual Installation (Developers)</summary>
 
 1. Download the latest ZIP from [Releases](https://github.com/meettomorrow/lee-su-threads/releases)
 2. Unzip the file
@@ -81,6 +89,8 @@ A Chrome extension that automatically displays location info for Threads post au
 5. Click **Load unpacked**
 6. Select the unzipped folder
 7. The extension icon should appear in your toolbar
+
+</details>
 
 ### Usage
 
