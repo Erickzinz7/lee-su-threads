@@ -3,6 +3,9 @@
 (function() {
   'use strict';
 
+  // Cross-browser compatibility: use browser.* API if available (Firefox), fallback to chrome.*
+  const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
   // Store extracted profiles
   const profileCache = new Map();
 
@@ -21,7 +24,7 @@
   // Inject the network interceptor script
   function injectScript() {
     const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('injected.js');
+    script.src = browserAPI.runtime.getURL('injected.js');
     script.onload = function() {
       this.remove();
     };
@@ -35,7 +38,7 @@
       profileCache.set(profileInfo.username, profileInfo);
 
       // Send to background script for persistent storage
-      chrome.runtime.sendMessage({
+      browserAPI.runtime.sendMessage({
         type: 'PROFILE_INFO_EXTRACTED',
         data: profileInfo
       });
@@ -57,7 +60,7 @@
     if (event.data?.type === 'threads-new-user-ids') {
       const newUserIds = event.data.data;
       if (newUserIds && Object.keys(newUserIds).length > 0) {
-        chrome.runtime.sendMessage({ type: 'STORE_USER_IDS', data: newUserIds });
+        browserAPI.runtime.sendMessage({ type: 'STORE_USER_IDS', data: newUserIds });
       }
     }
   });
@@ -555,16 +558,18 @@
     observeFeed();
 
     // Load cached profiles from storage
-    chrome.runtime.sendMessage({ type: 'GET_CACHED_PROFILES' }, (cachedProfiles) => {
+    browserAPI.runtime.sendMessage({ type: 'GET_CACHED_PROFILES' }).then((cachedProfiles) => {
       if (cachedProfiles) {
         for (const [username, data] of Object.entries(cachedProfiles)) {
           profileCache.set(username, data);
         }
       }
+    }).catch((err) => {
+      console.warn('[Threads Extractor] Failed to load cached profiles:', err);
     });
 
     // Load cached user IDs and pass to injected script
-    chrome.runtime.sendMessage({ type: 'GET_USER_ID_CACHE' }, (cachedUserIds) => {
+    browserAPI.runtime.sendMessage({ type: 'GET_USER_ID_CACHE' }).then((cachedUserIds) => {
       if (cachedUserIds && Object.keys(cachedUserIds).length > 0) {
         const userIdMap = {};
         for (const [username, data] of Object.entries(cachedUserIds)) {
@@ -574,6 +579,8 @@
         // Pass to injected script
         window.postMessage({ type: 'threads-load-userid-cache', data: userIdMap }, '*');
       }
+    }).catch((err) => {
+      console.warn('[Threads Extractor] Failed to load cached user IDs:', err);
     });
 
     // Enable auto-fetch after initial delay (wait for bulk-route-definitions to load)

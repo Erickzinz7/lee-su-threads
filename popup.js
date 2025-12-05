@@ -1,5 +1,8 @@
 // Popup script for Threads Profile Extractor
 
+// Cross-browser compatibility: use browser.* API if available (Firefox), fallback to chrome.*
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
 document.addEventListener('DOMContentLoaded', () => {
   const profileCountEl = document.getElementById('profileCount');
   const sessionCountEl = document.getElementById('sessionCount');
@@ -12,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Load cached profiles
   function loadProfiles() {
-    chrome.storage.local.get(['profileCache', 'sessionCount'], (result) => {
+    browserAPI.storage.local.get(['profileCache', 'sessionCount']).then((result) => {
       profiles = result.profileCache || {};
       const count = Object.keys(profiles).length;
       const sessionCount = result.sessionCount || 0;
@@ -21,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
       sessionCountEl.textContent = sessionCount;
 
       renderProfileList();
+    }).catch((err) => {
+      console.error('Failed to load profiles:', err);
     });
   }
 
@@ -64,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     profileListEl.querySelectorAll('.profile-item').forEach(item => {
       item.addEventListener('click', () => {
         const username = item.dataset.username;
-        chrome.tabs.create({ url: `https://www.threads.com/@${username}` });
+        browserAPI.tabs.create({ url: `https://www.threads.com/@${username}` });
       });
     });
   }
@@ -101,11 +106,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Clear cache
   clearBtn.addEventListener('click', () => {
     if (confirm('Are you sure you want to clear all cached profiles?')) {
-      chrome.storage.local.set({ profileCache: {}, sessionCount: 0 }, () => {
-        profiles = {};
-        loadProfiles();
-        showToast('Cache cleared!');
-      });
+      browserAPI.storage.local.set({ profileCache: {}, sessionCount: 0 })
+        .then(() => {
+          profiles = {};
+          loadProfiles();
+          showToast('Cache cleared!');
+        })
+        .catch((err) => {
+          console.error('Failed to clear cache:', err);
+          showToast('Failed to clear cache', true);
+        });
     }
   });
 
@@ -146,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadProfiles();
 
   // Listen for updates from content script
-  chrome.runtime.onMessage.addListener((message) => {
+  browserAPI.runtime.onMessage.addListener((message) => {
     if (message.type === 'PROFILE_INFO_EXTRACTED') {
       loadProfiles();
     }

@@ -1,14 +1,17 @@
 // Background service worker for Threads Profile Info Extractor
 
+// Cross-browser compatibility: use browser.* API if available (Firefox), fallback to chrome.*
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
 const USER_ID_CACHE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days for user ID mapping
 
-// Listen for messages from content script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+// Handle async message responses for both Chrome and Firefox
+function handleAsyncMessage(message, sender, sendResponse) {
   if (message.type === 'PROFILE_INFO_EXTRACTED') {
     console.log('[Threads Extractor] Profile info received:', message.data);
 
     // Store the profile info
-    chrome.storage.local.get(['profileCache'], (result) => {
+    browserAPI.storage.local.get(['profileCache']).then((result) => {
       const cache = result.profileCache || {};
       const username = message.data.username;
       if (username) {
@@ -16,13 +19,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           ...message.data,
           timestamp: Date.now()
         };
-        chrome.storage.local.set({ profileCache: cache });
+        browserAPI.storage.local.set({ profileCache: cache });
       }
     });
+    return false;
   }
 
   if (message.type === 'GET_CACHED_PROFILES') {
-    chrome.storage.local.get(['profileCache'], (result) => {
+    browserAPI.storage.local.get(['profileCache']).then((result) => {
       sendResponse(result.profileCache || {});
     });
     return true; // Keep channel open for async response
@@ -31,7 +35,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Store user ID mappings (username -> userId)
   if (message.type === 'STORE_USER_IDS') {
     const userIds = message.data; // { username: userId, ... }
-    chrome.storage.local.get(['userIdCache'], (result) => {
+    browserAPI.storage.local.get(['userIdCache']).then((result) => {
       const cache = result.userIdCache || {};
       const now = Date.now();
       for (const [username, userId] of Object.entries(userIds)) {
@@ -39,26 +43,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           cache[username] = { userId, timestamp: now };
         }
       }
-      chrome.storage.local.set({ userIdCache: cache });
+      browserAPI.storage.local.set({ userIdCache: cache });
     });
+    return false;
   }
 
   // Get cached user IDs
   if (message.type === 'GET_USER_ID_CACHE') {
-    chrome.storage.local.get(['userIdCache'], (result) => {
+    browserAPI.storage.local.get(['userIdCache']).then((result) => {
       sendResponse(result.userIdCache || {});
     });
-    return true;
+    return true; // Keep channel open for async response
   }
-});
+
+  return false;
+}
+
+// Listen for messages from content script
+browserAPI.runtime.onMessage.addListener(handleAsyncMessage);
 
 // Clean up old cache entries on startup
-chrome.runtime.onStartup.addListener(() => {
+browserAPI.runtime.onStartup.addListener(() => {
   const now = Date.now();
   const profileMaxAge = 24 * 60 * 60 * 1000; // 24 hours for profiles
 
   // Clean profile cache
-  chrome.storage.local.get(['profileCache'], (result) => {
+  browserAPI.storage.local.get(['profileCache']).then((result) => {
     const cache = result.profileCache || {};
     const cleanedCache = {};
     for (const [username, data] of Object.entries(cache)) {
@@ -66,11 +76,11 @@ chrome.runtime.onStartup.addListener(() => {
         cleanedCache[username] = data;
       }
     }
-    chrome.storage.local.set({ profileCache: cleanedCache });
+    browserAPI.storage.local.set({ profileCache: cleanedCache });
   });
 
   // Clean user ID cache (30 days)
-  chrome.storage.local.get(['userIdCache'], (result) => {
+  browserAPI.storage.local.get(['userIdCache']).then((result) => {
     const cache = result.userIdCache || {};
     const cleanedCache = {};
     for (const [username, data] of Object.entries(cache)) {
@@ -78,6 +88,6 @@ chrome.runtime.onStartup.addListener(() => {
         cleanedCache[username] = data;
       }
     }
-    chrome.storage.local.set({ userIdCache: cleanedCache });
+    browserAPI.storage.local.set({ userIdCache: cleanedCache });
   });
 });
