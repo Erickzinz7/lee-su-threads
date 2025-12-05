@@ -207,10 +207,10 @@
   function extractProfileInfo(obj, result = {}) {
     if (!obj || typeof obj !== 'object') return result;
 
-    // Initialize counters for position-based parsing
-    if (result._labelCount === undefined) {
-      result._labelCount = 0;
-      result._valueCount = 0;
+    // Initialize array to collect all label-value pairs
+    if (result._pairs === undefined) {
+      result._pairs = [];
+      result._currentLabel = null;
     }
 
     if (obj['bk.components.Text']) {
@@ -219,20 +219,12 @@
       const style = textComp.text_style;
 
       if (style === 'semibold' && text) {
-        // This is a label (e.g., "名稱", "已加入", "所在地點", or English equivalents)
-        result._labelCount++;
-        result._lastLabelIndex = result._labelCount;
-      } else if (style === 'normal' && text && result._lastLabelIndex) {
-        // This is a value - use position to determine what it is
-        // Position 1: Name (skip, we get this from RichText)
-        // Position 2: Joined date (after "已加入" / "Joined" label)
-        // Position 3: Location (after "所在地點" / "Based in" label)
-        if (result._lastLabelIndex === 2 && !result.joined) {
-          result.joined = text;
-        } else if (result._lastLabelIndex === 3 && !result.location) {
-          result.location = text;
-        }
-        result._lastLabelIndex = null; // Reset after capturing value
+        // This is a label - store it
+        result._currentLabel = text;
+      } else if (style === 'normal' && text && result._currentLabel) {
+        // This is a value - pair it with the label
+        result._pairs.push({ label: result._currentLabel, value: text });
+        result._currentLabel = null;
       }
     }
 
@@ -245,11 +237,12 @@
         }
       }
       // Try multiple patterns for name/username extraction
+      // Support both half-width ( and full-width （ parentheses
       // Pattern 1: "Name (@username)" with closing paren
-      let match = fullText.match(/^(.+?)\s*\(@([\w.]+)\)$/);
+      let match = fullText.match(/^(.+?)\s*[（(]@([\w.]+)[)）]$/);
       // Pattern 2: "Name (@username" without closing paren (sometimes the ) is in a separate span)
       if (!match) {
-        match = fullText.match(/^(.+?)\s*\(@([\w.]+)/);
+        match = fullText.match(/^(.+?)\s*[（(]@([\w.]+)/);
       }
       // Pattern 3: Just "@username" somewhere in the text
       if (!match) {
@@ -257,7 +250,7 @@
         if (match) {
           result.username = match[1];
           // Try to get display name from the part before @
-          const nameMatch = fullText.match(/^(.+?)\s*\(@/);
+          const nameMatch = fullText.match(/^(.+?)\s*[（(]@/);
           if (nameMatch) {
             result.displayName = nameMatch[1].trim();
           }
@@ -285,6 +278,21 @@
       } else if (typeof value === 'object' && value !== null) {
         extractProfileInfo(value, result);
       }
+    }
+
+    // After traversing, extract joined and location from pairs
+    // Pairs order: [0]=Joined, [1]=Location, [2+]=extra fields (Previous names, Verified, etc.)
+    // - Joined is always the 1st pair (index 0), may contain "·" suffix to strip
+    // - Location is always the 2nd pair (index 1)
+    if (result._pairs && result._pairs.length >= 2 && !result._pairsProcessed) {
+      result._pairsProcessed = true;
+      const pairs = result._pairs;
+      // 1st pair = Joined (clean up user number suffix)
+      let joinedRaw = pairs[0].value;
+      // Remove everything after · (user number like "100M+", "#2,697,767")
+      result.joined = joinedRaw.split(/\s*[·•]\s*/)[0].trim();
+      // 2nd pair = Location
+      result.location = pairs[1].value;
     }
 
     return result;
@@ -385,9 +393,9 @@
         logResponse('FETCH', url, text);
         const profileInfo = parseProfileResponse(text);
         if (profileInfo && profileInfo.username) {
-          delete profileInfo._lastLabelIndex;
-          delete profileInfo._labelCount;
-          delete profileInfo._valueCount;
+          delete profileInfo._pairs;
+          delete profileInfo._currentLabel;
+          delete profileInfo._pairsProcessed;
           console.log('[Threads Extractor] Extracted profile info:', profileInfo);
           window.dispatchEvent(new CustomEvent('threads-profile-extracted', { detail: profileInfo }));
         }
@@ -473,9 +481,9 @@
           logResponse('XHR', xhrUrl, this.responseText);
           const profileInfo = parseProfileResponse(this.responseText);
           if (profileInfo && profileInfo.username) {
-            delete profileInfo._lastLabelIndex;
-            delete profileInfo._labelCount;
-            delete profileInfo._valueCount;
+            delete profileInfo._pairs;
+            delete profileInfo._currentLabel;
+            delete profileInfo._pairsProcessed;
             console.log('[Threads Extractor] Extracted profile info (XHR):', profileInfo);
             window.dispatchEvent(new CustomEvent('threads-profile-extracted', { detail: profileInfo }));
           }
@@ -560,9 +568,9 @@
       }
 
       if (profileInfo && (profileInfo.username || profileInfo.joined || profileInfo.location)) {
-        delete profileInfo._lastLabelIndex;
-        delete profileInfo._labelCount;
-        delete profileInfo._valueCount;
+        delete profileInfo._pairs;
+        delete profileInfo._currentLabel;
+        delete profileInfo._pairsProcessed;
         // If still no username, mark it with the user ID
         if (!profileInfo.username) {
           profileInfo.username = `user_${targetUserId}`;
