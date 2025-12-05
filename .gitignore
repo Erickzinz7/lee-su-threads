@@ -5,9 +5,16 @@
 .idea/
 .vscode/
 *.swp
+*.swo
 
 # Codeium
 .codeiumignore
 
-# Build artifacts (if any)
-*.zip
+# Build output
+dist-zip/
+
+# Temporary files
+tmp/
+
+# Logs
+*.log

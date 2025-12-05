@@ -1,0 +1,46 @@
+name: Release Chrome Extension
+
+on:
+  push:
+    tags:
+      - "v*" # Trigger on version tags like v1.0.0
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Update version in manifest.json
+        run: |
+          jq ".version = \"$VERSION\"" manifest.json > temp.json && mv temp.json manifest.json
+
+      - name: Package extension
+        run: |
+          mkdir -p dist-zip
+          zip -r "dist-zip/lee-su-threads-v${VERSION}.zip" . \
+            -x "*.git*" \
+            -x "*.DS_Store" \
+            -x "dist-zip/*" \
+            -x "scripts/*" \
+            -x "tmp/*" \
+            -x "*.md" \
+            -x "*.sh"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist-zip/*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
