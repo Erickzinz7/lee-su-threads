@@ -152,12 +152,12 @@
 
     const joinedLabel = browserAPI.i18n.getMessage('joined') || 'Joined';
     if (profileInfo.location) {
-      badge.innerHTML = `📍 ${escapeHtml(profileInfo.location)}`;
+      badge.textContent = escapeHtml(profileInfo.location);
       badge.title = `${joinedLabel}: ${profileInfo.joined || 'Unknown'}`;
     } else {
       // Location not available
       const noLocationText = browserAPI.i18n.getMessage('noLocation') || 'No location';
-      badge.innerHTML = `🌐 ${noLocationText}`;
+      badge.textContent = noLocationText;
       badge.title = profileInfo.joined ? `${joinedLabel}: ${profileInfo.joined}` : noLocationText;
     }
 
@@ -203,7 +203,7 @@
     });
 
     if (!userId) {
-      btn.innerHTML = '❓';
+      btn.textContent = '❓';
       btn.title = 'User ID not found. Click to retry.';
       btn.disabled = false;
       return;
@@ -233,14 +233,14 @@
     if (result) {
       if (result._rateLimited) {
         // Rate limited - button will show retry
-        btn.innerHTML = '🔄';
+        btn.textContent = '🔄';
         btn.title = 'Rate limited. Click to retry later.';
         btn.disabled = false;
       } else {
         btn.style.display = 'none';
       }
     } else {
-      btn.innerHTML = '🔄';
+      btn.textContent = '🔄';
       btn.title = 'Failed to load. Click to retry.';
       btn.disabled = false;
     }
@@ -388,8 +388,8 @@
       // Create the fetch button
       const btn = document.createElement('button');
       btn.className = 'threads-fetch-btn';
-      btn.innerHTML = 'ℹ️';
-      btn.title = `Get profile info for @${username}`;
+      btn.textContent = '📍';
+      btn.title = `Get location for @${username}`;
       btn.setAttribute('data-username', username);
 
       btn.addEventListener('click', async (e) => {
@@ -397,7 +397,7 @@
         e.stopPropagation();
 
         btn.disabled = true;
-        btn.innerHTML = '⏳';
+        btn.textContent = '⏳';
 
         // Use postMessage to communicate with injected script
         const requestId = Math.random().toString(36).substring(7);
@@ -454,13 +454,13 @@
           if (result) {
             btn.style.display = 'none';
           } else {
-            btn.innerHTML = '🔄';
+            btn.textContent = '🔄';
             btn.title = 'Failed to load. Click to retry.';
             btn.disabled = false;
           }
         } else {
           console.log(`[Threads Extractor] Could not find user ID for @${username}`);
-          btn.innerHTML = '❓';
+          btn.textContent = '❓';
           btn.title = 'User ID not found. Try scrolling or clicking on their profile first.';
           btn.disabled = false;
         }
@@ -470,6 +470,11 @@
       // Find the parent that contains the time, and insert after it
       const timeParent = timeEl.closest('span') || timeEl.parentElement;
       if (timeParent) {
+        // Ensure vertical alignment of the row
+        if (timeParent.parentElement) {
+          timeParent.parentElement.style.alignItems = 'center';
+        }
+
         timeParent.parentElement?.insertBefore(btn, timeParent.nextSibling);
 
         // Auto-fetch: observe button for visibility
