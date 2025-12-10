@@ -102,7 +102,7 @@
     "message": "스크롤하는 동안 프로필 정보 자동 가져오기"
   },
   "onboardingFeature3": {
-    "message": "신규 사용자(30일 이내 가입)를 [신규] 배지로 강조 표시"
+    "message": "신규 사용자(2개월 이내 가입)를 [신규] 배지로 강조 표시"
   },
   "onboardingFeature4": {
     "message": "팝업 패널에서 위치 통계 보기"

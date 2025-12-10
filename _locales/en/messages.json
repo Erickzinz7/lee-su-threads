@@ -102,7 +102,7 @@
     "message": "Automatically fetches profile info as you scroll"
   },
   "onboardingFeature3": {
-    "message": "Highlights new users (joined within 30 days) with a [NEW] badge"
+    "message": "Highlights new users (joined within 2 months) with a [NEW] badge"
   },
   "onboardingFeature4": {
     "message": "View location statistics in the popup panel"

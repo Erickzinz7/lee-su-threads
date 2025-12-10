@@ -159,6 +159,90 @@
   font-weight: 600;
 }
 
+/* Location badge in followers/following list */
+.threads-friendships-location-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  margin-right: 12px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 20px;
+  font-size: 12px;
+  line-height: 16px;
+  color: rgba(0, 0, 0, 0.7);
+  font-family: system-ui, -apple-system, "system-ui", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  cursor: default;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+
+/* Dark mode support for badge */
+@media (prefers-color-scheme: dark) {
+  .threads-friendships-location-badge {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* Fetch location button in followers/following list */
+.threads-friendships-fetch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  margin-right: 12px;
+  padding: 4px 10px;
+  min-width: 32px;
+  background: rgba(243, 245, 247, 1);
+  border: none;
+  border-radius: 20px;
+  font-size: 13px;
+  line-height: 16px;
+  color: rgb(0, 0, 0);
+  font-family: system-ui, -apple-system, "system-ui", Roboto, Helvetica, Arial, sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.threads-friendships-fetch-btn:hover:not(:disabled) {
+  background: rgba(228, 230, 235, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.threads-friendships-fetch-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+  background: rgba(243, 245, 247, 0.6);
+}
+
+.threads-friendships-fetch-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .threads-friendships-fetch-btn {
+    background: rgba(54, 54, 54, 1);
+    color: rgb(243, 245, 247);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+
+  .threads-friendships-fetch-btn:hover:not(:disabled) {
+    background: rgba(74, 74, 74, 1);
+  }
+
+  .threads-friendships-fetch-btn:disabled {
+    background: rgba(54, 54, 54, 0.6);
+  }
+}
+
 /* Floating panel */
 #threads-extractor-panel {
   position: fixed;

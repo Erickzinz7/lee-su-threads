@@ -205,6 +205,13 @@ window.fetch = async function(...args) {
   const url = args[0]?.url || args[0];
   const options = args[1] || {};
 
+  // Extract friendly name from headers for GraphQL queries
+  let friendlyName = null;
+  if (options.headers) {
+    const headers = options.headers instanceof Headers ? options.headers : new Headers(options.headers || {});
+    friendlyName = headers.get('x-fb-friendly-name');
+  }
+
   // Capture session tokens
   if (options.body) {
     try {
@@ -277,6 +284,45 @@ window.fetch = async function(...args) {
           }
         }
 
+        // Special handling for Followers/Following GraphQL queries
+        // Check by friendly name (from headers) or data structure
+        const isFriendshipsQuery = friendlyName === 'BarcelonaFriendshipsDialogUserQuery' ||
+                                   friendlyName === 'BarcelonaFriendshipsFollowersTabQuery' ||
+                                   friendlyName === 'BarcelonaFriendshipsFollowingTabQuery' ||
+                                   url.includes('BarcelonaFriendshipsDialogUserQuery') ||
+                                   url.includes('BarcelonaFriendshipsFollowersTabQuery') ||
+                                   url.includes('BarcelonaFriendshipsFollowingTabQuery');
+
+        if (url.includes('graphql/query') && isFriendshipsQuery) {
+          console.log('%c[Threads Extractor] 📋 Intercepted Followers/Following dialog!', 'color: #3b82f6; font-weight: bold;');
+          console.log('  Friendly name:', friendlyName);
+
+          // Try multiple possible data structures
+          const edges =
+            data.data?.xdt_text_app_user?.follower_users?.edges ||
+            data.data?.xdt_text_app_user?.following_users?.edges ||
+            data.data?.user?.followers?.edges ||
+            data.data?.user?.following?.edges ||
+            [];
+
+          if (edges.length > 0) {
+            console.log(`%c[Threads Extractor] Found ${edges.length} users in list`, 'color: #3b82f6;');
+            // Dispatch event to content script to handle location injection
+            window.dispatchEvent(new CustomEvent('threads-friendships-list-loaded', {
+              detail: {
+                users: edges.map(edge => ({
+                  pk: edge.node.pk,
+                  username: edge.node.username,
+                  full_name: edge.node.full_name
+                }))
+              }
+            }));
+          } else {
+            console.log('%c[Threads Extractor] ⚠️ Matched followers/following query but no edges found', 'color: #f59e0b;');
+            console.log('Response data structure:', data);
+          }
+        }
+
         const beforeCount = userIdMap.size;
         extractUserIds(data, url);
         const afterCount = userIdMap.size;
@@ -329,6 +375,8 @@ XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
 
 XMLHttpRequest.prototype.send = function(...args) {
   const xhrUrl = this._threadsUrl;
+  const xhrHeaders = this._threadsHeaders || {};
+  const requestBody = args[0];
 
   // Handle bulk-route-definitions via XHR
   if (xhrUrl && xhrUrl.includes('bulk-route-definitions')) {
@@ -365,6 +413,64 @@ XMLHttpRequest.prototype.send = function(...args) {
         }
       } catch (e) {
         console.error('[Threads Extractor] Error processing bulk-route-definitions:', e);
+      }
+    });
+  }
+
+  // Handle GraphQL Followers/Following queries via XHR
+  // Check both headers and request body for the friendly name
+  let friendlyName = xhrHeaders['x-fb-friendly-name'];
+
+  // If not in headers, check request body
+  if (!friendlyName && requestBody && typeof requestBody === 'string') {
+    const bodyMatch = requestBody.match(/fb_api_req_friendly_name=([^&]+)/);
+    if (bodyMatch) {
+      friendlyName = decodeURIComponent(bodyMatch[1]);
+    }
+  }
+
+  const isFriendshipsQuery = friendlyName === 'BarcelonaFriendshipsDialogUserQuery' ||
+                             friendlyName === 'BarcelonaFriendshipsFollowersTabQuery' ||
+                             friendlyName === 'BarcelonaFriendshipsFollowingTabQuery';
+
+  if (xhrUrl && xhrUrl.includes('graphql/query') && isFriendshipsQuery) {
+    this.addEventListener('load', function() {
+      try {
+        console.log('%c[Threads Extractor] 📋 Intercepted Followers/Following dialog (XHR)!', 'color: #3b82f6; font-weight: bold;');
+        console.log('  Friendly name:', friendlyName);
+
+        let jsonStr = this.responseText;
+        if (jsonStr.startsWith('for (;;);')) {
+          jsonStr = jsonStr.substring(9);
+        }
+        const data = JSON.parse(jsonStr);
+
+        // Try multiple possible data structures
+        const edges =
+          data.data?.xdt_text_app_user?.follower_users?.edges ||
+          data.data?.xdt_text_app_user?.following_users?.edges ||
+          data.data?.user?.followers?.edges ||
+          data.data?.user?.following?.edges ||
+          [];
+
+        if (edges.length > 0) {
+          console.log(`%c[Threads Extractor] Found ${edges.length} users in list`, 'color: #3b82f6;');
+          // Dispatch event to content script to handle location injection
+          window.dispatchEvent(new CustomEvent('threads-friendships-list-loaded', {
+            detail: {
+              users: edges.map(edge => ({
+                pk: edge.node.pk,
+                username: edge.node.username,
+                full_name: edge.node.full_name
+              }))
+            }
+          }));
+        } else {
+          console.log('%c[Threads Extractor] ⚠️ Matched followers/following query but no edges found', 'color: #f59e0b;');
+          console.log('Response data structure:', data);
+        }
+      } catch (e) {
+        console.error('[Threads Extractor] Error processing GraphQL followers/following response:', e);
       }
     });
   }
