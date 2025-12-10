@@ -1,6 +1,7 @@
 // Content script for Threads Profile Info Extractor
-import { parseJoinedDate, isNewUser } from './lib/dateParser.js';
-import { findUsernameContainer, findPostContainer, detectActiveTab } from './lib/domHelpers.js';
+import { findPostContainer, detectActiveTab } from './lib/domHelpers.js';
+import { injectLocationUIForUser } from './lib/friendshipsUI.js';
+import { displayProfileInfo, autoFetchProfile, createProfileBadge } from './lib/postUI.js';
 
 'use strict';
 
@@ -46,7 +47,7 @@ window.addEventListener('threads-profile-extracted', (event) => {
     });
 
     // Update UI with new profile info
-    displayProfileInfo(profileInfo);
+    displayProfileInfo(profileInfo, profileCache);
   }
 });
 
@@ -194,367 +195,11 @@ function showRateLimitToast() {
   }, RATE_LIMIT_COOLDOWN_MS);
 }
 
-// Inject appropriate location UI for a user (badge, empty indicator, or fetch button)
-function injectLocationUIForUser(username, userId) {
-  const profileInfo = profileCache.get(username);
-
-  if (profileInfo) {
-    if (profileInfo.location) {
-      // Has cached data with location - display it
-      injectLocationBadgeIntoUserRow(username, profileInfo);
-    } else {
-      // Has cached data but no location - show empty indicator
-      injectEmptyLocationIntoUserRow(username);
-    }
-  } else if (userId) {
-    // No cached data - add a button to fetch on demand
-    injectLocationButtonIntoUserRow(username, userId);
-  }
-}
-
 // Inject location badges into followers/following list
 function injectLocationBadgesIntoFriendshipsList(users) {
   for (const user of users) {
     const { pk, username } = user;
-    injectLocationUIForUser(username, pk);
-  }
-}
-
-// Inject a fetch location button into a specific user row
-function injectLocationButtonIntoUserRow(username, userId) {
-  // Find all links to this user's profile
-  const profileLinks = document.querySelectorAll(`a[href="/@${username}"]`);
-
-  profileLinks.forEach((link) => {
-    // Navigate up to find the user row container
-    let userRow = link;
-    for (let i = 0; i < 10 && userRow; i++) {
-      if (userRow.querySelector && userRow.textContent.includes(username)) {
-        // Check if we already added a button or badge
-        if (userRow.querySelector('.threads-friendships-fetch-btn') ||
-            userRow.querySelector('.threads-friendships-location-badge')) {
-          return;
-        }
-
-        // Find the container to insert button
-        const insertTarget = findUsernameContainer(userRow, username);
-        if (insertTarget) {
-          const btn = createFriendshipsLocationButton(username, userId);
-          // Find the follow button that is a direct child
-          const followButton = Array.from(insertTarget.children).find(child =>
-            child.getAttribute && child.getAttribute('role') === 'button'
-          );
-          if (followButton) {
-            insertTarget.insertBefore(btn, followButton);
-          } else {
-            // No follow button (e.g., own profile) - append to end
-            insertTarget.appendChild(btn);
-          }
-          break;
-        }
-      }
-      userRow = userRow.parentElement;
-    }
-  });
-}
-
-// Create a fetch location button for friendships list
-function createFriendshipsLocationButton(username, userId) {
-  const btn = document.createElement('button');
-  btn.className = 'threads-friendships-fetch-btn';
-  btn.textContent = '📍';
-  btn.title = `Get location for @${username}`;
-  btn.setAttribute('data-username', username);
-  btn.setAttribute('data-userid', userId);
-
-  btn.addEventListener('click', async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    btn.disabled = true;
-    btn.textContent = '⏳';
-
-    // Fetch profile info
-    const fetchRequestId = Math.random().toString(36).substring(7);
-    const profileInfo = await new Promise((resolve) => {
-      const handler = (event) => {
-        if (event.data?.type === 'threads-fetch-response' && event.data?.requestId === fetchRequestId) {
-          window.removeEventListener('message', handler);
-          resolve(event.data.result);
-        }
-      };
-      window.addEventListener('message', handler);
-
-      window.postMessage({
-        type: 'threads-fetch-request',
-        requestId: fetchRequestId,
-        userId: userId
-      }, '*');
-
-      setTimeout(() => {
-        window.removeEventListener('message', handler);
-        resolve(null);
-      }, 10000);
-    });
-
-    if (profileInfo && !profileInfo._rateLimited) {
-      profileCache.set(username, profileInfo);
-
-      // Replace button with badge
-      if (profileInfo.location) {
-        const badge = createLocationBadge(profileInfo);
-        btn.parentElement.replaceChild(badge, btn);
-      } else {
-        // No location data
-        btn.textContent = '—';
-        btn.title = 'No location available';
-        btn.disabled = true;
-      }
-    } else if (profileInfo?._rateLimited) {
-      btn.textContent = '⏸';
-      btn.title = 'Rate limited. Try again later.';
-      btn.disabled = false;
-    } else {
-      btn.textContent = '🔄';
-      btn.title = 'Failed. Click to retry.';
-      btn.disabled = false;
-    }
-  });
-
-  return btn;
-}
-
-// Inject location badge into a specific user row in followers/following list
-function injectLocationBadgeIntoUserRow(username, profileInfo) {
-  // Find all links to this user's profile
-  const profileLinks = document.querySelectorAll(`a[href="/@${username}"]`);
-
-  profileLinks.forEach(link => {
-    // Navigate up to find the user row container
-    let userRow = link;
-    for (let i = 0; i < 10 && userRow; i++) {
-      // Look for the container that has the username
-      if (userRow.querySelector && userRow.textContent.includes(username)) {
-        // Check if we already added a badge
-        if (userRow.querySelector('.threads-friendships-location-badge')) {
-          return;
-        }
-
-        // Find where to insert the badge
-        const insertTarget = findUsernameContainer(userRow, username);
-        if (insertTarget) {
-          const badge = createLocationBadge(profileInfo);
-          // Find the follow button that is a direct child
-          const followButton = Array.from(insertTarget.children).find(child =>
-            child.getAttribute && child.getAttribute('role') === 'button'
-          );
-          if (followButton) {
-            insertTarget.insertBefore(badge, followButton);
-          } else {
-            // No follow button (e.g., own profile) - append to end
-            insertTarget.appendChild(badge);
-          }
-          break;
-        }
-      }
-      userRow = userRow.parentElement;
-    }
-  });
-}
-
-// Inject empty location indicator into a specific user row in followers/following list
-function injectEmptyLocationIntoUserRow(username) {
-  // Find all links to this user's profile
-  const profileLinks = document.querySelectorAll(`a[href="/@${username}"]`);
-
-  profileLinks.forEach(link => {
-    // Navigate up to find the user row container
-    let userRow = link;
-    for (let i = 0; i < 10 && userRow; i++) {
-      // Look for the container that has the username
-      if (userRow.querySelector && userRow.textContent.includes(username)) {
-        // Check if we already added something
-        if (userRow.querySelector('.threads-friendships-location-badge') ||
-            userRow.querySelector('.threads-friendships-fetch-btn')) {
-          return;
-        }
-
-        // Find where to insert the indicator
-        const insertTarget = findUsernameContainer(userRow, username);
-        if (insertTarget) {
-          const emptyIndicator = createEmptyLocationIndicator(username);
-          // Find the follow button that is a direct child
-          const followButton = Array.from(insertTarget.children).find(child =>
-            child.getAttribute && child.getAttribute('role') === 'button'
-          );
-          if (followButton) {
-            insertTarget.insertBefore(emptyIndicator, followButton);
-          } else {
-            // No follow button (e.g., own profile) - append to end
-            insertTarget.appendChild(emptyIndicator);
-          }
-          break;
-        }
-      }
-      userRow = userRow.parentElement;
-    }
-  });
-}
-
-// Create an empty location indicator (when cached but no location available)
-function createEmptyLocationIndicator(username) {
-  const indicator = document.createElement('button');
-  indicator.className = 'threads-friendships-fetch-btn'; // Reuse same styling
-  indicator.textContent = '➖';
-  indicator.title = `No location available for @${username}`;
-  indicator.disabled = true;
-  indicator.style.cursor = 'default';
-  indicator.style.opacity = '0.4';
-  return indicator;
-}
-
-// Create a location badge for friendships list
-function createLocationBadge(profileInfo) {
-  const badge = document.createElement('span');
-  badge.className = 'threads-friendships-location-badge';
-
-  const locationText = document.createElement('span');
-  locationText.textContent = profileInfo.location;
-
-  badge.appendChild(locationText);
-
-  if (profileInfo.joined) {
-    const joinedLabel = browserAPI.i18n.getMessage('joined') || 'Joined';
-    badge.title = `${joinedLabel}: ${profileInfo.joined}`;
-  }
-
-  return badge;
-}
-
-// Create and display profile info badge
-function displayProfileInfo(profileInfo) {
-  const username = profileInfo.username;
-
-  // Find all fetch buttons for this user
-  const buttons = document.querySelectorAll(`.threads-fetch-btn[data-username="${username}"]`);
-
-  buttons.forEach(btn => {
-    // Check if we already added a badge next to this button
-    if (btn.previousElementSibling?.classList?.contains('threads-profile-info-badge')) return;
-
-    // Create the info badge and insert before the button (so it appears to the left)
-    const badge = createProfileBadge(profileInfo);
-    btn.parentElement?.insertBefore(badge, btn);
-
-    // Hide button after success - badge shows the info
-    btn.style.display = 'none';
-  });
-}
-
-// Find the post container element
-// Create the profile info badge element - simple location only
-function createProfileBadge(profileInfo) {
-  const badge = document.createElement('span');
-  badge.className = 'threads-profile-info-badge';
-
-  const joinedLabel = browserAPI.i18n.getMessage('joined') || 'Joined';
-  const isNew = isNewUser(profileInfo.joined);
-  const newLabel = browserAPI.i18n.getMessage('newUser') || 'NEW';
-
-  if (profileInfo.location) {
-    badge.textContent = profileInfo.location;
-    badge.title = `${joinedLabel}: ${profileInfo.joined || 'Unknown'}`;
-  } else {
-    // Location not available
-    const noLocationText = browserAPI.i18n.getMessage('noLocation') || 'No location';
-    badge.textContent = noLocationText;
-    badge.title = profileInfo.joined ? `${joinedLabel}: ${profileInfo.joined}` : noLocationText;
-  }
-
-  // Add [NEW] label for new users (skip if verified)
-  if (isNew && !profileInfo.isVerified) {
-    const newTag = document.createElement('span');
-    newTag.className = 'threads-new-user-tag';
-    newTag.textContent = `[${newLabel}]`;
-    badge.appendChild(newTag);
-  }
-
-  return badge;
-}
-
-
-// Auto-fetch profile info for a username
-async function autoFetchProfile(username, btn) {
-  // Skip if already cached
-  if (profileCache.has(username)) {
-    const cached = profileCache.get(username);
-    displayProfileInfo(cached);
-    btn.style.display = 'none';
-    return;
-  }
-
-  // Request user ID lookup
-  const requestId = Math.random().toString(36).substring(7);
-  const userId = await new Promise((resolve) => {
-    const handler = (event) => {
-      if (event.data?.type === 'threads-userid-response' && event.data?.requestId === requestId) {
-        window.removeEventListener('message', handler);
-        resolve(event.data.userId);
-      }
-    };
-    window.addEventListener('message', handler);
-    window.postMessage({
-      type: 'threads-userid-request',
-      requestId: requestId,
-      username: username
-    }, '*');
-    setTimeout(() => {
-      window.removeEventListener('message', handler);
-      resolve(null);
-    }, 2000);
-  });
-
-  if (!userId) {
-    btn.textContent = '❓';
-    btn.title = 'User ID not found. Click to retry.';
-    btn.disabled = false;
-    return;
-  }
-
-  // Request profile fetch
-  const fetchRequestId = Math.random().toString(36).substring(7);
-  const result = await new Promise((resolve) => {
-    const handler = (event) => {
-      if (event.data?.type === 'threads-fetch-response' && event.data?.requestId === fetchRequestId) {
-        window.removeEventListener('message', handler);
-        resolve(event.data.result);
-      }
-    };
-    window.addEventListener('message', handler);
-    window.postMessage({
-      type: 'threads-fetch-request',
-      requestId: fetchRequestId,
-      userId: userId
-    }, '*');
-    setTimeout(() => {
-      window.removeEventListener('message', handler);
-      resolve(null);
-    }, 10000);
-  });
-
-  if (result) {
-    if (result._rateLimited) {
-      // Rate limited - button will show retry
-      btn.textContent = '🔄';
-      btn.title = 'Rate limited. Click to retry later.';
-      btn.disabled = false;
-    } else {
-      btn.style.display = 'none';
-    }
-  } else {
-    btn.textContent = '🔄';
-    btn.title = 'Failed to load. Click to retry.';
-    btn.disabled = false;
+    injectLocationUIForUser(username, pk, profileCache);
   }
 }
 
@@ -595,7 +240,7 @@ async function processFetchQueue() {
     }
 
     btn.textContent = '⏳';
-    await autoFetchProfile(username, btn);
+    await autoFetchProfile(username, btn, profileCache);
 
     // Throttle: wait before next fetch
     if (fetchQueue.length > 0) {
@@ -803,67 +448,6 @@ function addFetchButtons() {
   });
 }
 
-// Try to find user ID for a username by looking at page data
-async function findUserIdForUsername(username) {
-  // Check the global map first
-  const userIdMap = window.__threadsUserIdMap;
-  if (userIdMap?.has(username)) {
-    return userIdMap.get(username);
-  }
-
-  // Try to find in React fiber/props (Threads uses React)
-  const profileLink = document.querySelector(`a[href="/@${username}"]`);
-  if (profileLink) {
-    // Walk up to find data
-    let element = profileLink;
-    for (let i = 0; i < 20 && element; i++) {
-      // Check for React fiber
-      const keys = Object.keys(element);
-      for (const key of keys) {
-        if (key.startsWith('__reactFiber') || key.startsWith('__reactProps')) {
-          try {
-            const fiber = element[key];
-            const userId = findUserIdInObject(fiber, username);
-            if (userId) return userId;
-          } catch (e) { /* ignore */ }
-        }
-      }
-      element = element.parentElement;
-    }
-  }
-
-  return null;
-}
-
-// Recursively search for user ID in an object
-function findUserIdInObject(obj, targetUsername, depth = 0) {
-  if (depth > 15 || !obj || typeof obj !== 'object') return null;
-
-  // Check if this object has both username and id/pk
-  if (obj.username === targetUsername) {
-    if (obj.id && String(obj.id).match(/^\d+$/)) return String(obj.id);
-    if (obj.pk && String(obj.pk).match(/^\d+$/)) return String(obj.pk);
-    if (obj.user_id && String(obj.user_id).match(/^\d+$/)) return String(obj.user_id);
-  }
-
-  // Check user object
-  if (obj.user && obj.user.username === targetUsername) {
-    if (obj.user.id) return String(obj.user.id);
-    if (obj.user.pk) return String(obj.user.pk);
-  }
-
-  // Recurse
-  for (const key of Object.keys(obj)) {
-    if (key.startsWith('_') && key !== '_owner') continue; // Skip internal React props
-    try {
-      const result = findUserIdInObject(obj[key], targetUsername, depth + 1);
-      if (result) return result;
-    } catch (e) { /* ignore circular refs */ }
-  }
-
-  return null;
-}
-
 // Observe DOM for new posts AND for friendships dialog reopening/scrolling
 function observeFeed() {
   const observer = new MutationObserver((mutations) => {
@@ -917,7 +501,7 @@ function observeFeed() {
 
                     if (userData) {
                       // We have the user data with pk from GraphQL
-                      injectLocationUIForUser(username, userData.pk);
+                      injectLocationUIForUser(username, userData.pk, profileCache);
                     } else {
                       // User not in our GraphQL list - try to get user ID from injected script
                       // Request user ID lookup via postMessage
@@ -943,7 +527,7 @@ function observeFeed() {
 
                       getUserIdPromise.then(userId => {
                         if (userId) {
-                          injectLocationUIForUser(username, userId);
+                          injectLocationUIForUser(username, userId, profileCache);
                         }
                       });
                     }
