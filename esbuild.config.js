@@ -5,7 +5,7 @@ import { execSync } from 'child_process';
 const isWatch = process.argv.includes('--watch');
 const isDev = isWatch || process.env.NODE_ENV === 'development';
 
-// Get version from git tags
+// Get version from git tags (supports both annotated and lightweight tags)
 function getGitVersion() {
   try {
     // Get the latest git tag (e.g., "v0.3.7" or "0.3.7")
@@ -13,7 +13,12 @@ function getGitVersion() {
     // Remove 'v' prefix if present
     return tag.startsWith('v') ? tag.slice(1) : tag;
   } catch (error) {
-    console.warn('Warning: Could not get git version, using manifest version');
+    const errorMessage = error.message || String(error);
+    if (errorMessage.includes('No names found') || errorMessage.includes('No tags')) {
+      console.warn('⚠️  No git tags found, using manifest version for dev build');
+    } else {
+      console.warn('⚠️  Could not get git version:', errorMessage.split('\n')[0]);
+    }
     return null;
   }
 }
@@ -21,12 +26,17 @@ function getGitVersion() {
 // Increment the patch version (e.g., "0.3.7" -> "0.3.8")
 function incrementVersion(version) {
   const parts = version.split('.');
-  if (parts.length >= 3) {
-    parts[2] = String(Number(parts[2]) + 1);
-    return parts.join('.');
+  if (parts.length < 3) {
+    throw new Error(`Invalid version format "${version}". Expected semver format (X.Y.Z)`);
   }
-  // If version format is unexpected, just append .1
-  return `${version}.1`;
+
+  const patchNum = Number(parts[2]);
+  if (isNaN(patchNum)) {
+    throw new Error(`Invalid patch version "${parts[2]}" in version "${version}". Must be a number`);
+  }
+
+  parts[2] = String(patchNum + 1);
+  return parts.join('.');
 }
 
 // Build JavaScript bundles (shared between Chrome and Firefox)
@@ -77,10 +87,14 @@ async function copyStaticFilesForBrowser(browser) {
   if (isDev) {
     const gitVersion = getGitVersion();
     if (gitVersion) {
-      manifest.version = incrementVersion(gitVersion);
+      const newVersion = incrementVersion(gitVersion);
+      console.log(`📦 ${browser}: Dev build using git tag ${gitVersion} → ${newVersion}`);
+      manifest.version = newVersion;
     } else {
-      // Fallback: increment manifest version
-      manifest.version = incrementVersion(manifest.version);
+      const oldVersion = manifest.version;
+      const newVersion = incrementVersion(oldVersion);
+      console.log(`📦 ${browser}: Dev build using manifest version ${oldVersion} → ${newVersion}`);
+      manifest.version = newVersion;
     }
   }
 

@@ -12,7 +12,9 @@ jobs:
       contents: write
     env:
       # Set to 'true' in repository settings to enable Firefox signing
-      # Requires FIREFOX_API_KEY and FIREFOX_API_SECRET to be configured
+      # Repository Settings → Secrets and variables → Actions → Variables tab → New repository variable
+      # Name: ENABLE_FIREFOX_SIGNING, Value: true
+      # Requires FIREFOX_API_KEY and FIREFOX_API_SECRET to be configured in Secrets tab
       ENABLE_FIREFOX_SIGNING: ${{ vars.ENABLE_FIREFOX_SIGNING || 'false' }}
 
     steps:
