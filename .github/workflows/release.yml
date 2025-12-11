@@ -38,6 +38,21 @@ jobs:
           jq ".version = \"$VERSION\"" src/manifest.json > temp.json && mv temp.json src/manifest.json
           jq ".version = \"$VERSION\"" src/manifest.firefox.json > temp.json && mv temp.json src/manifest.firefox.json
 
+      - name: Build Firefox AMO version (without update_url)
+        run: |
+          echo "🔨 Building Firefox AMO version (no update_url, version ${VERSION})..."
+          npm run build
+          # Copy firefox build to firefox-amo and remove update_url
+          cp -r dist/firefox dist/firefox-amo
+          jq 'del(.browser_specific_settings.gecko.update_url)' dist/firefox-amo/manifest.json > temp.json && mv temp.json dist/firefox-amo/manifest.json
+
+      - name: Build Firefox self-hosted version (with update_url)
+        if: env.ENABLE_FIREFOX_SIGNING == 'true'
+        run: |
+          echo "🔨 Building Firefox self-hosted version (with update_url, version ${VERSION}.0)..."
+          # Update version to append .0 for self-hosted build
+          jq ".version = \"${VERSION}.0\"" dist/firefox/manifest.json > temp.json && mv temp.json dist/firefox/manifest.json
+
       - name: Package extensions
         run: bash scripts/package.sh
 
@@ -57,13 +72,13 @@ jobs:
         if: env.ENABLE_FIREFOX_SIGNING == 'true'
         run: |
           if [ -f dist-zip/lee_su_threads-*.xpi ]; then
-            mv dist-zip/lee_su_threads-*.xpi dist-zip/lee-su-threads-firefox-v${VERSION}-signed.xpi
+            mv dist-zip/lee_su_threads-*.xpi dist-zip/lee-su-threads-firefox-v${VERSION}.0-signed.xpi
           fi
 
       - name: Validate signed extension exists
         if: env.ENABLE_FIREFOX_SIGNING == 'true'
         run: |
-          if [ ! -f "dist-zip/lee-su-threads-firefox-v${VERSION}-signed.xpi" ]; then
+          if [ ! -f "dist-zip/lee-su-threads-firefox-v${VERSION}.0-signed.xpi" ]; then
             echo "Error: Signed extension not found"
             exit 1
           fi
@@ -71,7 +86,7 @@ jobs:
       - name: Generate update manifest
         if: env.ENABLE_FIREFOX_SIGNING == 'true'
         run: |
-          sed "s/VERSION_PLACEHOLDER/$VERSION/g" updates.json.template > dist-zip/updates.json
+          sed "s/VERSION_PLACEHOLDER/${VERSION}.0/g" updates.json.template > dist-zip/updates.json
 
       - name: Create GitHub Release (with signed Firefox)
         if: env.ENABLE_FIREFOX_SIGNING == 'true'

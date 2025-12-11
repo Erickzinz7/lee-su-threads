@@ -57,7 +57,11 @@ const buildOptions = {
 };
 
 // Copy static files to a specific browser directory
-async function copyStaticFilesForBrowser(browser) {
+// Options:
+//   - removeUpdateUrl: if true, removes update_url from Firefox manifest (for AMO builds)
+//   - versionSuffix: if provided, appends to version (e.g., ".0" for self-hosted builds)
+async function copyStaticFilesForBrowser(browser, options = {}) {
+  const { removeUpdateUrl = false, versionSuffix = '' } = options;
   const distDir = `dist/${browser}`;
 
   // Ensure browser-specific dist directory exists
@@ -96,6 +100,16 @@ async function copyStaticFilesForBrowser(browser) {
       console.log(`📦 ${browser}: Dev build using manifest version ${oldVersion} → ${newVersion}`);
       manifest.version = newVersion;
     }
+  }
+
+  // Apply version suffix if provided (e.g., ".0" for self-hosted builds)
+  if (versionSuffix) {
+    manifest.version = manifest.version + versionSuffix;
+  }
+
+  // Remove update_url for AMO builds
+  if (removeUpdateUrl && manifest.browser_specific_settings?.gecko?.update_url) {
+    delete manifest.browser_specific_settings.gecko.update_url;
   }
 
   await writeFile(`${distDir}/manifest.json`, JSON.stringify(manifest, null, 2));

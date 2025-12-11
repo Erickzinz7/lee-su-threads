@@ -29,42 +29,54 @@ The build system automatically handles versioning:
 
 ## Release Process
 
-### Firefox Self-Distribution Setup
+### Firefox Distribution Setup
 
-This repository uses **self-distributed (unlisted)** Firefox extensions signed via Mozilla's API. This means:
+This repository supports two Firefox distribution channels:
 
-- Extensions are signed by Mozilla but not listed on AMO (addons.mozilla.org)
-- Users install via direct download link from GitHub Releases
-- Firefox auto-updates work via the `updates.json` manifest
+#### 1. AMO Unlisted (Manual Review)
+- **Package:** `lee-su-threads-firefox-v{version}.zip` (no `update_url`)
+- **Purpose:** Submit to AMO for unlisted review
+- **Process:** Manual submission to https://addons.mozilla.org/developers/
+
+#### 2. Self-Hosted (Auto-Signed)
+- **Package:** `lee-su-threads-firefox-v{version}.0-signed.xpi` (with `update_url`)
+- **Purpose:** Direct distribution with auto-updates
+- **Process:** Automatically signed via Mozilla API in CI
+- **Version:** Appends `.0` to distinguish from AMO version (e.g., `0.3.8` → `0.3.8.0`)
 
 #### Setting up Firefox API Credentials
 
-To enable automatic signing in CI, you need Mozilla API credentials:
+To enable automatic signing (self-hosted builds), configure Mozilla API credentials:
 
 1. Go to https://addons.mozilla.org/developers/addon/api/key/
 2. Generate new API credentials
-3. Add them as GitHub repository secrets:
-   - `FIREFOX_API_KEY` (format: `user:{user_id}:{key_id}`)
-   - `FIREFOX_API_SECRET`
+3. Add to GitHub repository:
+   - **Secrets:**
+     - `FIREFOX_API_KEY` (format: `user:{user_id}:{key_id}`)
+     - `FIREFOX_API_SECRET`
+   - **Variables:**
+     - `ENABLE_FIREFOX_SIGNING` = `true`
 
 #### How the Release Workflow Works
 
 When you push a version tag (e.g., `v0.3.8`):
 
-**With Firefox API credentials (main repository):**
-1. Builds both Chrome and Firefox extensions
-2. Signs Firefox extension with `--channel=unlisted` (no manual review needed)
+**With `ENABLE_FIREFOX_SIGNING=true` (main repository):**
+1. Builds Chrome and two Firefox versions:
+   - **AMO:** `v0.3.8` without `update_url`
+   - **Self-hosted:** `v0.3.8.0` with `update_url`
+2. Signs self-hosted version with `--channel=unlisted`
 3. Creates GitHub Release with:
-   - `lee-su-threads-chrome-v{version}.zip` (unsigned, for Chrome Web Store submission)
-   - `lee-su-threads-firefox-v{version}-signed.xpi` (signed, for user installation)
-   - `updates.json` (update manifest for auto-updates)
+   - `lee-su-threads-chrome-v0.3.8.zip` (for Chrome Web Store)
+   - `lee-su-threads-firefox-v0.3.8.zip` (for AMO unlisted submission)
+   - `lee-su-threads-firefox-v0.3.8.0-signed.xpi` (self-hosted with auto-updates)
+   - `updates.json` (update manifest pointing to `.0` version)
 
-**Without Firefox API credentials (forks):**
-1. Builds both Chrome and Firefox extensions
-2. Skips signing steps
-3. Creates GitHub Release with:
-   - `lee-su-threads-chrome-v{version}.zip` (unsigned)
-   - `lee-su-threads-firefox-v{version}.zip` (unsigned)
+**With `ENABLE_FIREFOX_SIGNING=false` (forks):**
+1. Builds Chrome and Firefox AMO version only
+2. Creates GitHub Release with:
+   - `lee-su-threads-chrome-v0.3.8.zip`
+   - `lee-su-threads-firefox-v0.3.8.zip`
 
 ### Creating a Release
 
@@ -81,19 +93,20 @@ When you push a version tag (e.g., `v0.3.8`):
    - Create a GitHub Release
    - Upload the distribution files
 
-### Installing Self-Distributed Firefox Extension
+### Installing Self-Hosted Firefox Extension
 
-Users can install the signed Firefox extension from:
+Users can install the self-hosted Firefox extension from:
 ```
-https://github.com/meettomorrow/lee-su-threads/releases/latest/download/lee-su-threads-firefox-v{version}-signed.xpi
+https://github.com/meettomorrow/lee-su-threads/releases/latest/download/lee-su-threads-firefox-v{version}.0-signed.xpi
 ```
 
 Firefox will automatically check for updates via the `updates.json` manifest.
 
-### Distribution Channels
+### Distribution Channels Summary
 
-- **Chrome**: Unsigned `.zip` uploaded to Chrome Web Store manually
-- **Firefox**: Self-distributed signed `.xpi` via GitHub Releases with auto-updates
+- **Chrome Web Store**: Manual upload of unsigned `.zip`
+- **Firefox AMO (Unlisted)**: Manual submission of unsigned `.zip` (no `update_url`)
+- **Firefox Self-Hosted**: Auto-signed `.xpi` via GitHub Releases with auto-updates
 
 ## Questions?
 
