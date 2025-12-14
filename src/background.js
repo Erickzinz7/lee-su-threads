@@ -81,6 +81,14 @@ function handleAsyncMessage(message, sender, sendResponse) {
     return false;
   }
 
+  // Open popup in a new tab
+  if (message.type === 'OPEN_POPUP_TAB') {
+    browserAPI.tabs.create({
+      url: browserAPI.runtime.getURL('popup.html')
+    });
+    return false;
+  }
+
   return false;
 }
 

@@ -12,7 +12,10 @@
     "message": "No location data"
   },
   "popupTitle": {
-    "message": "Threads Location Viewer"
+    "message": "Lee-Su-Threads (Who Are You) - Settings"
+  },
+  "popupTitleShort": {
+    "message": "Settings"
   },
   "popupSubtitle": {
     "message": "View location info from your feed"
@@ -87,7 +90,7 @@
     "message": "You can turn off auto-query in extension settings to avoid rate limiting."
   },
   "rateLimitOpenSettings": {
-    "message": "How to Use"
+    "message": "Settings"
   },
   "onboardingTitle": {
     "message": "Welcome to Lee-Su-Threads!"

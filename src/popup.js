@@ -4,6 +4,43 @@ import { isNewUser } from './lib/dateParser.js';
 // Cross-browser compatibility: use browser.* API if available (Firefox), fallback to chrome.*
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
+// Theme detection and application
+function detectAndApplyTheme() {
+  // First, try to get Threads theme from storage (set by content script)
+  browserAPI.storage.local.get(['threadsTheme']).then((result) => {
+    let theme = result.threadsTheme;
+
+    // If no Threads theme detected, fall back to system preference
+    if (!theme) {
+      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    // Apply theme to document
+    document.documentElement.setAttribute('data-theme', theme);
+  });
+}
+
+// Listen for system theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  // Only react to system changes if no Threads theme is set
+  browserAPI.storage.local.get(['threadsTheme']).then((result) => {
+    if (!result.threadsTheme) {
+      const theme = e.matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  });
+});
+
+// Apply theme on load
+detectAndApplyTheme();
+
+// Display version number
+const versionNumberEl = document.getElementById('versionNumber');
+if (versionNumberEl) {
+  const version = browserAPI.runtime.getManifest().version;
+  versionNumberEl.textContent = `v${version}`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const profileCountEl = document.getElementById('profileCount');
   const profileListEl = document.getElementById('profileList');
@@ -16,11 +53,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabBtns = document.querySelectorAll('.tab-btn');
   const profilesTab = document.getElementById('profilesTab');
   const locationsTab = document.getElementById('locationsTab');
+  const contentEl = document.querySelector('.content');
 
   let profiles = {};
   let filterText = '';
   let filterNoLocation = false; // Special flag for filtering profiles without location
   let activeTab = 'profiles';
+
+  // Scroll detection for hiding stats in mobile view
+  let scrollTimeout;
+  if (contentEl) {
+    contentEl.addEventListener('scroll', () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        if (contentEl.scrollTop > 20) {
+          document.body.classList.add('scrolled');
+        } else {
+          document.body.classList.remove('scrolled');
+        }
+      }, 10);
+    });
+  }
 
   // Tab switching
   tabBtns.forEach(btn => {

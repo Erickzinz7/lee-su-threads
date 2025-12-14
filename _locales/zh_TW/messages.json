@@ -12,7 +12,10 @@
     "message": "無地點資料"
   },
   "popupTitle": {
-    "message": "Threads 地點資訊"
+    "message": "哩速隨 - 設定"
+  },
+  "popupTitleShort": {
+    "message": "設定"
   },
   "popupSubtitle": {
     "message": "查看動態中的地點資訊"
