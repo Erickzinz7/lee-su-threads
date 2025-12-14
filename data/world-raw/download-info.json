@@ -1,0 +1,37 @@
+{
+  "downloadedAt": "2025-12-14T12:41:58.960Z",
+  "source": "https://github.com/stefangabos/world_countries",
+  "cdnUrl": "https://cdn.jsdelivr.net/npm/world_countries_lists@latest/data/countries",
+  "languages": {
+    "en": {
+      "code": "en",
+      "filename": "world-en.json",
+      "count": 249,
+      "hash": "5fe2196be3bf1eccadbb94ab923152d59596969520c1a07db8b36ae083d513bb"
+    },
+    "zh_TW": {
+      "code": "zh-tw",
+      "filename": "world-zh_TW.json",
+      "count": 249,
+      "hash": "5fe2196be3bf1eccadbb94ab923152d59596969520c1a07db8b36ae083d513bb"
+    },
+    "zh_CN": {
+      "code": "zh",
+      "filename": "world-zh_CN.json",
+      "count": 249,
+      "hash": "5fe2196be3bf1eccadbb94ab923152d59596969520c1a07db8b36ae083d513bb"
+    },
+    "ja": {
+      "code": "ja",
+      "filename": "world-ja.json",
+      "count": 249,
+      "hash": "5fe2196be3bf1eccadbb94ab923152d59596969520c1a07db8b36ae083d513bb"
+    },
+    "ko": {
+      "code": "ko",
+      "filename": "world-ko.json",
+      "count": 249,
+      "hash": "5fe2196be3bf1eccadbb94ab923152d59596969520c1a07db8b36ae083d513bb"
+    }
+  }
+}

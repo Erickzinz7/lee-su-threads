@@ -6,6 +6,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "download:world": "node scripts/download-world.cjs",
+    "generate:mapper": "node scripts/generate-location-mapper.cjs",
+    "prebuild": "npm run generate:mapper",
     "build": "node esbuild.config.js",
     "build:watch": "node esbuild.config.js --watch",
     "build:firefox-amo": "FIREFOX_BUILD_TYPE=amo node esbuild.config.js",

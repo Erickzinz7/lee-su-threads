@@ -1,0 +1,37 @@
+{
+  "overrides": {
+    "TW": {
+      "en": "Taiwan",
+      "zh_CN": "台湾"
+    },
+    "US": {
+      "en": "United States",
+      "ja": "米国"
+    },
+    "AU": {
+      "zh_TW": "澳大利亞"
+    },
+    "ID": {
+      "zh_TW": "印尼"
+    },
+    "AE": {
+      "zh_TW": "阿拉伯聯合大公國"
+    },
+    "TH": {
+      "ja": "タイ"
+    },
+    "FR": {
+      "ja": "フランス"
+    }
+  },
+  "additions": {},
+  "aliases": {
+    "TW": [],
+    "HK": [
+      "hongkong"
+    ],
+    "MO": [
+      "macao"
+    ]
+  }
+}

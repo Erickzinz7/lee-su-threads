@@ -1,141 +1,90 @@
 /**
- * Maps location strings to country flag emojis
- * Supports multiple languages (EN, ZH_TW, ZH_CN, JA, KO)
+ * Location to Flag Emoji Mapper
+ *
+ * This module provides locale-aware country flag lookup functionality.
+ * It loads country data from data/location-flags.json at runtime.
  */
 
-// Country flag mapping with multi-language support
-const LOCATION_TO_FLAG = {
-  // Taiwan
-  '🇹🇼': [
-    'taiwan', '台灣', '台湾', '臺灣', 'tw', 'roc',
-    'タイワン', '대만', 'republic of china'
-  ],
+import locationFlagsData from '../../data/location-flags.json';
 
-  // Japan
-  '🇯🇵': [
-    'japan', '日本', 'jp', 'nippon', 'nihon',
-    'ジャパン', '일본'
-  ],
+// Safely load location flags with validation
+const LOCATION_FLAGS = (() => {
+  try {
+    if (!locationFlagsData || typeof locationFlagsData !== 'object') {
+      console.error('[LocationMapper] Invalid location-flags.json: not an object');
+      return {};
+    }
 
-  // South Korea
-  '🇰🇷': [
-    'south korea', 'korea', '韓國', '韩国', '南韓', '南韩',
-    'kr', 'republic of korea', 'rok',
-    '韓国', '대한민국', '한국'
-  ],
+    const count = Object.keys(locationFlagsData).length;
+    if (count === 0) {
+      console.warn('[LocationMapper] location-flags.json is empty');
+      return {};
+    }
 
-  // China
-  '🇨🇳': [
-    'china', '中國', '中国', 'cn', 'prc',
-    "people's republic of china",
-    '中华人民共和国', '中華人民共和國',
-    '中国本土', '大陆', '大陸',
-    '中華', '中华',
-    'チャイナ', '중국'
-  ],
-
-  // Hong Kong
-  '🇭🇰': [
-    'hong kong', '香港', 'hk', 'hongkong',
-    'ホンコン', '홍콩'
-  ],
-
-  // Macau
-  '🇲🇴': [
-    'macau', 'macao', '澳門', '澳门', 'mo',
-    'マカオ', '마카오'
-  ],
-
-  // Singapore
-  '🇸🇬': [
-    'singapore', '新加坡', 'sg',
-    'シンガポール', '싱가포르', '싱가폴'
-  ],
-
-  // Malaysia
-  '🇲🇾': [
-    'malaysia', '馬來西亞', '马来西亚', 'my',
-    'マレーシア', '말레이시아'
-  ],
-
-  // Thailand
-  '🇹🇭': [
-    'thailand', '泰國', '泰国', 'th',
-    'タイ', '태국'
-  ],
-
-  // Vietnam
-  '🇻🇳': [
-    'vietnam', 'viet nam', '越南', 'vn',
-    'ベトナム', '베트남'
-  ],
-
-  // Philippines
-  '🇵🇭': [
-    'philippines', '菲律賓', '菲律宾', 'ph',
-    'フィリピン', '필리핀'
-  ],
-
-  // Indonesia
-  '🇮🇩': [
-    'indonesia', '印尼', '印度尼西亞', '印度尼西亚', 'id',
-    'インドネシア', '인도네시아'
-  ],
-
-  // United States
-  '🇺🇸': [
-    'united states', 'usa', 'us', 'america',
-    '美國', '美国', 'u.s.a', 'u.s.',
-    'アメリカ', '미국'
-  ],
-
-  // Canada
-  '🇨🇦': [
-    'canada', '加拿大', 'ca',
-    'カナダ', '캐나다'
-  ],
-
-  // United Kingdom
-  '🇬🇧': [
-    'united kingdom', 'uk', 'great britain', 'britain',
-    '英國', '英国', 'gb',
-    'イギリス', '영국',
-    'england', 'scotland', 'wales'
-  ],
-
-  // Australia
-  '🇦🇺': [
-    'australia', '澳洲', '澳大利亞', '澳大利亚', 'au',
-    'オーストラリア', '호주'
-  ],
-
-  // India
-  '🇮🇳': [
-    'india', '印度', 'in',
-    'インド', '인도'
-  ],
-
-  // France
-  '🇫🇷': [
-    'france', '法國', '法国', 'fr',
-    'フランス', '프랑스'
-  ],
-
-  // Germany
-  '🇩🇪': [
-    'germany', '德國', '德国', 'de',
-    'ドイツ', '독일'
-  ]
-};
-
-// Build reverse lookup map (normalized location -> flag)
-const locationLookup = new Map();
-
-for (const [flag, variants] of Object.entries(LOCATION_TO_FLAG)) {
-  for (const variant of variants) {
-    locationLookup.set(variant.toLowerCase(), flag);
+    console.log(`[LocationMapper] Successfully loaded ${count} territories`);
+    return locationFlagsData;
+  } catch (error) {
+    console.error('[LocationMapper] Failed to load location-flags.json:', error);
+    console.warn('[LocationMapper] Flag lookup will not be available. Location text will be displayed without flags.');
+    return {};
   }
+})();
+
+// Helper function to normalize a language code to our locale keys
+function normalizeLanguage(lang) {
+  if (lang.startsWith('zh-TW') || lang.startsWith('zh-Hant')) return 'zh_TW';
+  if (lang.startsWith('zh')) return 'zh_CN';
+  if (lang.startsWith('ja')) return 'ja';
+  if (lang.startsWith('ko')) return 'ko';
+  return 'en';
 }
+
+// Detect all user's accepted locales once at startup
+const userLocales = (() => {
+  // Get all accepted languages from browser settings (in preference order)
+  const langs = navigator.languages || [navigator.language || 'en'];
+
+  // Normalize each to our locale keys and dedupe
+  const normalized = new Set();
+  for (const lang of langs) {
+    normalized.add(normalizeLanguage(lang));
+  }
+
+  return Array.from(normalized);
+})();
+
+// Build locale-aware lookup map for multiple locales
+function buildLookup(locales) {
+  const map = new Map();
+
+  // If LOCATION_FLAGS failed to load, return empty map
+  if (!LOCATION_FLAGS || Object.keys(LOCATION_FLAGS).length === 0) {
+    return map;
+  }
+
+  for (const [flag, translations] of Object.entries(LOCATION_FLAGS)) {
+    // Always add common variants (locale-agnostic)
+    if (translations.common) {
+      for (const variant of translations.common) {
+        map.set(variant, flag);
+      }
+    }
+
+    // Add variants for all user's preferred locales
+    for (const locale of locales) {
+      if (translations[locale]) {
+        for (const variant of translations[locale]) {
+          map.set(variant, flag);
+        }
+      }
+    }
+  }
+
+  return map;
+}
+
+// Build lookup map for user's accepted locales
+const locationLookup = buildLookup(userLocales);
 
 /**
  * Get country flag emoji for a location string
