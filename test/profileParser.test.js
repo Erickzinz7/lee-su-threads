@@ -182,5 +182,17 @@ describe('parseProfileResponse', () => {
       // Test Unicode decoding with Chinese labels (\\u53f0\\u7063 = 台灣, \\u672a\\u5206\\u4eab = 未分享)
       expect(result.location).toBe('台灣');
     });
+
+    it('should parse "Not shared" location from on_bind when visibility is false', () => {
+      const response = loadFixture('profile-not-shared-zh.txt');
+      const result = parseProfileResponse(response);
+
+      expect(result.username).toBe('testuser');
+      expect(result.displayName).toBe('Test User');
+      // Joined date includes user number in raw data, but should be stripped
+      expect(result.joined).toBe('2023年7月');
+      // When visibility is false, should extract "未分享" (Not shared)
+      expect(result.location).toBe('未分享');
+    });
   });
 });
