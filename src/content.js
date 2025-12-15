@@ -2,6 +2,7 @@
 import { findPostContainer, detectActiveTab } from './lib/domHelpers.js';
 import { injectLocationUIForUser, createLocationBadge } from './lib/friendshipsUI.js';
 import { displayProfileInfo, autoFetchProfile, createProfileBadge } from './lib/postUI.js';
+import { isSingleUserNotification, findIconElement, extractIconColor } from './lib/notificationDetector.js';
 import { polyfillCountryFlagEmojis } from 'country-flag-emoji-polyfill';
 
 'use strict';
@@ -332,10 +333,18 @@ const visibilityObserver = new IntersectionObserver((entries) => {
   });
 }, { threshold: 0.1 });
 
+// Detect if we're on an activity page (replies, follows, etc.)
+function isActivityPage() {
+  const path = window.location.pathname;
+  return path.includes('/activity/') || path === '/activity';
+}
+
 // Add "Get Info" buttons after the time element on posts
 function addFetchButtons() {
   // Find all time elements that haven't been processed
   const timeElements = document.querySelectorAll('time:not([data-threads-info-added])');
+
+  const onActivityPage = isActivityPage();
 
   timeElements.forEach(async timeEl => {
     // Mark as processed
@@ -347,6 +356,18 @@ function addFetchButtons() {
 
     // Skip if we already added a button to this post
     if (postContainer.querySelector('.threads-fetch-btn')) return;
+
+    // On activity pages, only process single-user notifications (replies, mentions, quotes)
+    // Skip likes, follows, and other aggregated notifications
+    if (onActivityPage) {
+      const iconElement = findIconElement(postContainer);
+      if (!iconElement) return; // Skip if no icon detected
+
+      const iconColor = extractIconColor(iconElement);
+      if (!isSingleUserNotification(iconColor)) {
+        return; // Skip aggregated notifications (likes, follows, etc.)
+      }
+    }
 
     // Find the username for this post
     const profileLink = postContainer.querySelector('a[href^="/@"]');
@@ -364,10 +385,19 @@ function addFetchButtons() {
     // If we have cached data for this user, display badge directly without creating button
     if (profileCache.has(username)) {
       const timeParent = timeEl.closest('span') || timeEl.parentElement;
-      if (timeParent?.parentElement) {
-        timeParent.parentElement.style.alignItems = 'center';
-        const badge = await createProfileBadge(profileCache.get(username));
-        timeParent.parentElement.insertBefore(badge, timeParent.nextSibling);
+      const badge = await createProfileBadge(profileCache.get(username));
+
+      if (onActivityPage) {
+        // On activity pages: append inline to timeParent to avoid breaking block layout
+        if (timeParent) {
+          timeParent.appendChild(badge);
+        }
+      } else {
+        // On regular posts: insert as sibling (existing behavior)
+        if (timeParent?.parentElement) {
+          timeParent.parentElement.style.alignItems = 'center';
+          timeParent.parentElement.insertBefore(badge, timeParent.nextSibling);
+        }
       }
       return;
     }
@@ -382,12 +412,16 @@ function addFetchButtons() {
     // Insert button after the time element
     const timeParent = timeEl.closest('span') || timeEl.parentElement;
     if (timeParent) {
-      // Ensure vertical alignment of the row
-      if (timeParent.parentElement) {
-        timeParent.parentElement.style.alignItems = 'center';
+      if (onActivityPage) {
+        // On activity pages: append inline to timeParent
+        timeParent.appendChild(btn);
+      } else {
+        // On regular posts: insert as sibling
+        if (timeParent.parentElement) {
+          timeParent.parentElement.style.alignItems = 'center';
+          timeParent.parentElement.insertBefore(btn, timeParent.nextSibling);
+        }
       }
-
-      timeParent.parentElement?.insertBefore(btn, timeParent.nextSibling);
     }
 
     btn.addEventListener('click', async (e) => {

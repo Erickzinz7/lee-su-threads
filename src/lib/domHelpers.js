@@ -51,16 +51,26 @@ export function findUsernameContainer(container, username) {
 export function findPostContainer(element) {
   let current = element;
   let depth = 0;
-  const maxDepth = 15;
+  const maxDepth = 20; // Increased for notification pages which have deeper nesting
 
   while (current && depth < maxDepth) {
-    // Look for common post container patterns
-    if (current.getAttribute &&
-        (current.getAttribute('data-pressable-container') === 'true' ||
-         current.classList?.contains('x1lliihq') ||
-         current.tagName === 'ARTICLE')) {
-      return current;
+    if (current.getAttribute) {
+      // Prioritize data-pressable-container (most reliable)
+      if (current.getAttribute('data-pressable-container') === 'true') {
+        // Verify this container has a profile link (ensures we have the right container)
+        const hasProfileLink = current.querySelector('a[href^="/@"]');
+        if (hasProfileLink) {
+          return current;
+        }
+        // If no profile link, continue searching upward (might be a nested container)
+      }
+
+      // Fallback to ARTICLE tag
+      if (current.tagName === 'ARTICLE') {
+        return current;
+      }
     }
+
     current = current.parentElement;
     depth++;
   }
