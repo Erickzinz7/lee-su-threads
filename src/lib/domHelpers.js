@@ -104,3 +104,42 @@ export function detectActiveTab(tabs) {
 
   return { isFollowers, isFollowing };
 }
+
+/**
+ * Detect if an element is within a user-list context (follower/following rows, activity modal user rows)
+ * vs a post timeline context, based on DOM structure
+ *
+ * User-list rows have a horizontal layout: [username/time/bio] [Follow button]
+ * Post timeline/activity feed has a vertical layout: everything stacked
+ *
+ * @param {HTMLElement} container - The container element (from findPostContainer)
+ * @returns {boolean} - True if in user-list context, false if in post context
+ */
+export function isUserListContext(container) {
+  if (!container) return false;
+
+  // User-list rows have a distinctive pattern:
+  // The direct children under data-pressable-container > first div are:
+  //   1. div.x6s0dn4.x78zum5 (content wrapper - contains username, time, bio)
+  //   2. div.x6s0dn4.xqcrz7y.x78zum5 (button wrapper - contains Follow button)
+  // These two divs are siblings, and the presence of xqcrz7y indicates user-list layout
+
+  // Look for a div that has both x6s0dn4 and xqcrz7y (button section)
+  const buttonSection = container.querySelector(':scope > div > div.x6s0dn4.xqcrz7y');
+
+  if (buttonSection) {
+    // Check if button section also has x78zum5 (confirming it's a user-list row)
+    const hasCorrectButtonClasses = buttonSection.classList.contains('x78zum5');
+
+    if (hasCorrectButtonClasses) {
+      // Verify parent has two children (content + button side-by-side)
+      const parent = buttonSection.parentElement;
+
+      if (parent && parent.children.length >= 2) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}

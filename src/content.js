@@ -1,5 +1,5 @@
 // Content script for Threads Profile Info Extractor
-import { findPostContainer, detectActiveTab } from './lib/domHelpers.js';
+import { findPostContainer, detectActiveTab, isUserListContext } from './lib/domHelpers.js';
 import { injectLocationUIForUser, createLocationBadge } from './lib/friendshipsUI.js';
 import { displayProfileInfo, autoFetchProfile, createProfileBadge } from './lib/postUI.js';
 import { isSingleUserNotification, findIconElement, extractIconColor } from './lib/notificationDetector.js';
@@ -462,24 +462,49 @@ function addFetchButtons() {
 
     const username = match[1];
 
+    // Detect if this is a user-list context (activity modal, followers/following)
+    // vs a post timeline context
+    const isUserList = isUserListContext(postContainer);
+
     // Skip if we already have this profile cached and displayed
-    if (profileCache.has(username) && postContainer.querySelector('.threads-profile-info-badge')) return;
+    const badgeClass = isUserList ? '.threads-friendships-location-badge' : '.threads-profile-info-badge';
+    if (profileCache.has(username) && postContainer.querySelector(badgeClass)) return;
 
     // If we have cached data for this user, display badge directly without creating button
     if (profileCache.has(username)) {
-      const timeParent = timeEl.closest('span') || timeEl.parentElement;
-      const badge = await createProfileBadge(profileCache.get(username));
+      const profileInfo = profileCache.get(username);
 
-      if (onActivityPage) {
-        // On activity pages: append inline to timeParent to avoid breaking block layout
-        if (timeParent) {
-          timeParent.appendChild(badge);
+      if (isUserList) {
+        // User-list context: use friendships badge (pill style, positioned right)
+        const badge = await createLocationBadge(profileInfo);
+
+        // Find the button container (div.x6s0dn4.xqcrz7y) to insert badge before it
+        const buttonContainer = postContainer.querySelector('div.x6s0dn4.xqcrz7y');
+
+        if (buttonContainer && buttonContainer.parentElement) {
+          // Insert badge before the button container (as a sibling)
+          buttonContainer.parentElement.insertBefore(badge, buttonContainer);
+        } else {
+          // Fallback: append to container
+          console.warn('[Threads Extractor] Could not find button container for badge insertion');
+          postContainer.appendChild(badge);
         }
       } else {
-        // On regular posts: insert as sibling (existing behavior)
-        if (timeParent?.parentElement) {
-          timeParent.parentElement.style.alignItems = 'center';
-          timeParent.parentElement.insertBefore(badge, timeParent.nextSibling);
+        // Post context: use post badge (inline style)
+        const timeParent = timeEl.closest('span') || timeEl.parentElement;
+        const badge = await createProfileBadge(profileInfo);
+
+        if (onActivityPage) {
+          // On activity pages: append inline to timeParent to avoid breaking block layout
+          if (timeParent) {
+            timeParent.appendChild(badge);
+          }
+        } else {
+          // On regular posts: insert as sibling (existing behavior)
+          if (timeParent?.parentElement) {
+            timeParent.parentElement.style.alignItems = 'center';
+            timeParent.parentElement.insertBefore(badge, timeParent.nextSibling);
+          }
         }
       }
       return;
@@ -487,22 +512,44 @@ function addFetchButtons() {
 
     // Create the fetch button for uncached users
     const btn = document.createElement('button');
-    btn.className = 'threads-fetch-btn';
-    btn.textContent = '📍';
-    btn.title = `Get location for @${username}`;
-    btn.setAttribute('data-username', username);
 
-    // Insert button after the time element
-    const timeParent = timeEl.closest('span') || timeEl.parentElement;
-    if (timeParent) {
-      if (onActivityPage) {
-        // On activity pages: append inline to timeParent
-        timeParent.appendChild(btn);
+    if (isUserList) {
+      // User-list context: use friendships button style (pill style, positioned right)
+      btn.className = 'threads-friendships-fetch-btn';
+      btn.textContent = '📍';
+      btn.title = `Get location for @${username}`;
+      btn.setAttribute('data-username', username);
+
+      // Find the button container (div.x6s0dn4.xqcrz7y) to insert button before it
+      const buttonContainer = postContainer.querySelector('div.x6s0dn4.xqcrz7y');
+
+      if (buttonContainer && buttonContainer.parentElement) {
+        // Insert button before the button container (as a sibling)
+        buttonContainer.parentElement.insertBefore(btn, buttonContainer);
       } else {
-        // On regular posts: insert as sibling
-        if (timeParent.parentElement) {
-          timeParent.parentElement.style.alignItems = 'center';
-          timeParent.parentElement.insertBefore(btn, timeParent.nextSibling);
+        // Fallback: append to container
+        console.warn('[Threads Extractor] Could not find button container for button insertion');
+        postContainer.appendChild(btn);
+      }
+    } else {
+      // Post context: use post button style (inline style)
+      btn.className = 'threads-fetch-btn';
+      btn.textContent = '📍';
+      btn.title = `Get location for @${username}`;
+      btn.setAttribute('data-username', username);
+
+      // Insert button after the time element
+      const timeParent = timeEl.closest('span') || timeEl.parentElement;
+      if (timeParent) {
+        if (onActivityPage) {
+          // On activity pages: append inline to timeParent
+          timeParent.appendChild(btn);
+        } else {
+          // On regular posts: insert as sibling
+          if (timeParent.parentElement) {
+            timeParent.parentElement.style.alignItems = 'center';
+            timeParent.parentElement.insertBefore(btn, timeParent.nextSibling);
+          }
         }
       }
     }
@@ -582,7 +629,9 @@ function addFetchButtons() {
             // Show banner when user manually clicks button
             showLoginRequiredBanner();
           } else {
-            btn.style.display = 'none';
+            // Profile fetched successfully
+            // displayProfileInfo() (called from message handler) will insert the badge and hide the button
+            // No need to do it here to avoid duplicates
           }
         } else {
           btn.textContent = '🔄';
@@ -596,8 +645,11 @@ function addFetchButtons() {
       }
     });
 
-    // Auto-fetch: observe button for visibility
-    visibilityObserver.observe(btn);
+    // Auto-fetch: only observe post buttons, not friendships buttons
+    // Friendships buttons (in user-list context) should be manual click only
+    if (!isUserList) {
+      visibilityObserver.observe(btn);
+    }
   });
 }
 

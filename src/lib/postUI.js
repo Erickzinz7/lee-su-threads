@@ -13,15 +13,32 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 export async function displayProfileInfo(profileInfo, profileCache) {
   const username = profileInfo.username;
 
-  // Find all fetch buttons for this user
-  const buttons = document.querySelectorAll(`.threads-fetch-btn[data-username="${username}"]`);
+  // Find all fetch buttons for this user (both post and friendships buttons)
+  const postButtons = document.querySelectorAll(`.threads-fetch-btn[data-username="${username}"]`);
+  const friendshipsButtons = document.querySelectorAll(`.threads-friendships-fetch-btn[data-username="${username}"]`);
 
-  for (const btn of buttons) {
+  // Handle post-style buttons
+  for (const btn of postButtons) {
     // Check if we already added a badge next to this button
     if (btn.previousElementSibling?.classList?.contains('threads-profile-info-badge')) continue;
 
     // Create the info badge and insert before the button (so it appears to the left)
     const badge = await createProfileBadge(profileInfo);
+    btn.parentElement?.insertBefore(badge, btn);
+
+    // Hide button after success - badge shows the info
+    btn.style.display = 'none';
+  }
+
+  // Handle friendships-style buttons (need to import createLocationBadge)
+  const { createLocationBadge } = await import('./friendshipsUI.js');
+
+  for (const btn of friendshipsButtons) {
+    // Check if we already added a badge next to this button
+    if (btn.previousElementSibling?.classList?.contains('threads-friendships-location-badge')) continue;
+
+    // Create the location badge and insert before the button
+    const badge = await createLocationBadge(profileInfo);
     btn.parentElement?.insertBefore(badge, btn);
 
     // Hide button after success - badge shows the info

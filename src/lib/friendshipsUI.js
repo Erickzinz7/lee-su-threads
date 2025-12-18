@@ -259,18 +259,26 @@ export async function createLocationBadge(profileInfo) {
 
   // Get showFlags setting
   const { showFlags = true } = await browserAPI.storage.local.get(['showFlags']);
+  const joinedLabel = browserAPI.i18n.getMessage('joined') || 'Joined';
 
   const locationText = document.createElement('span');
-  // Display location with optional flag emoji
-  locationText.textContent = formatLocation(profileInfo.location, false, showFlags);
 
-  badge.appendChild(locationText);
+  if (profileInfo.location) {
+    // Display location with optional flag emoji
+    locationText.textContent = formatLocation(profileInfo.location, false, showFlags);
+    badge.appendChild(locationText);
 
-  if (profileInfo.joined) {
-    const joinedLabel = browserAPI.i18n.getMessage('joined') || 'Joined';
-    badge.title = `${profileInfo.location} • ${joinedLabel}: ${profileInfo.joined}`;
+    if (profileInfo.joined) {
+      badge.title = `${profileInfo.location} • ${joinedLabel}: ${profileInfo.joined}`;
+    } else {
+      badge.title = profileInfo.location;
+    }
   } else {
-    badge.title = profileInfo.location;
+    // Location not available - show "無地點資料"
+    const noLocationData = browserAPI.i18n.getMessage('noLocationData') || 'No location data';
+    locationText.textContent = noLocationData;
+    badge.appendChild(locationText);
+    badge.title = `${joinedLabel}: ${profileInfo.joined || 'Unknown'}`;
   }
 
   // Add [NEW] label for new users (skip if verified)
