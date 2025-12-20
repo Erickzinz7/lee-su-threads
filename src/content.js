@@ -465,14 +465,66 @@ function addFetchButtons() {
     }
 
     // Find the username for this post
-    const profileLink = postContainer.querySelector('a[href^="/@"]');
-    if (!profileLink) return;
+    // For reposts, there are TWO profile links: the reposter and the original poster
+    // We need to find the link closest to the time element (the original poster)
+    let profileLink = null;
+    let username = null;
 
-    const href = profileLink.getAttribute('href');
-    const match = href.match(/^\/@([\w.]+)/);
-    if (!match) return;
+    // First, try to find a profile link that's an ancestor of the time element
+    // (i.e., the time element is inside a link to the post, which contains the username)
+    let current = timeEl;
+    for (let i = 0; i < 10 && current; i++) {
+      const parentLink = current.closest('a[href^="/@"]');
+      if (parentLink) {
+        const href = parentLink.getAttribute('href');
+        const match = href.match(/^\/@([\w.]+)/);
+        if (match) {
+          username = match[1];
+          profileLink = parentLink;
+          break;
+        }
+      }
+      current = current.parentElement;
+    }
 
-    const username = match[1];
+    // If not found, look for a profile link in the same subtree as the time element
+    // (search upward to find a common parent, then search for the closest username link)
+    if (!username) {
+      let searchRoot = timeEl;
+      for (let i = 0; i < 5 && searchRoot; i++) {
+        searchRoot = searchRoot.parentElement;
+        if (!searchRoot) break;
+
+        // Find all profile links within this subtree
+        const links = searchRoot.querySelectorAll('a[href^="/@"]');
+        for (const link of links) {
+          const href = link.getAttribute('href');
+          // Match pure username links only (not post links)
+          const match = href.match(/^\/@([\w.]+)$/);
+          if (match) {
+            // Check if this link is close to the time element
+            if (searchRoot.contains(link) && searchRoot.contains(timeEl)) {
+              username = match[1];
+              profileLink = link;
+              break;
+            }
+          }
+        }
+        if (username) break;
+      }
+    }
+
+    // Fallback: if still not found, use the first link (old behavior)
+    if (!username) {
+      profileLink = postContainer.querySelector('a[href^="/@"]');
+      if (!profileLink) return;
+
+      const href = profileLink.getAttribute('href');
+      const match = href.match(/^\/@([\w.]+)/);
+      if (!match) return;
+
+      username = match[1];
+    }
 
     // Detect if this is a user-list context (activity modal, followers/following)
     // vs a post timeline context
