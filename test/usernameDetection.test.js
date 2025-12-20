@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { JSDOM } from 'jsdom';
+import { findUsernameFromTimeElement } from '../src/lib/domHelpers.js';
 
 /**
  * Tests for username detection logic in various post scenarios
- * This simulates the logic from addFetchButtons() in content.js
+ * Tests the actual production function from domHelpers.js
  */
 describe('Username Detection in Posts', () => {
   let document;
@@ -16,46 +17,10 @@ describe('Username Detection in Posts', () => {
 
   /**
    * Helper function to extract username from a time element
-   * This replicates the logic from content.js addFetchButtons()
+   * Uses the actual production function from domHelpers.js
    */
   function extractUsernameFromTimeElement(timeEl) {
-    let profileLink = null;
-    let username = null;
-
-    // First, try to find a profile link that's an ancestor of the time element
-    const parentLink = timeEl.closest('a[href^="/@"]');
-    if (parentLink) {
-      const href = parentLink.getAttribute('href');
-      // Match username links (with optional query params/hash), but not post links
-      const match = href.match(/^\/@([\w.]+)(?:[?#]|$)/);
-      if (match) {
-        username = match[1];
-        profileLink = parentLink;
-      }
-    }
-
-    // If not found, traverse up to find a nearby username link
-    if (!username) {
-      let current = timeEl;
-      for (let i = 0; i < 8 && current; i++) {
-        current = current.parentElement;
-        if (!current) break;
-
-        const usernameLinks = current.querySelectorAll('a[href^="/@"]');
-        for (const link of usernameLinks) {
-          const href = link.getAttribute('href');
-          // Match username links (with optional query params/hash), but not post links
-          const match = href.match(/^\/@([\w.]+)(?:[?#]|$)/);
-          if (match) {
-            username = match[1];
-            profileLink = link;
-            break;
-          }
-        }
-        if (username) break;
-      }
-    }
-
+    const { username } = findUsernameFromTimeElement(timeEl);
     return username;
   }
 

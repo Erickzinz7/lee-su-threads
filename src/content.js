@@ -1,5 +1,5 @@
 // Content script for Threads Profile Info Extractor
-import { findPostContainer, detectActiveTab, isUserListContext, findFollowButtonContainer } from './lib/domHelpers.js';
+import { findPostContainer, detectActiveTab, isUserListContext, findFollowButtonContainer, findUsernameFromTimeElement } from './lib/domHelpers.js';
 import { injectLocationUIForUser, createLocationBadge } from './lib/friendshipsUI.js';
 import { displayProfileInfo, autoFetchProfile, createProfileBadge } from './lib/postUI.js';
 import { isSingleUserNotification, findIconElement, extractIconColor } from './lib/notificationDetector.js';
@@ -467,52 +467,13 @@ function addFetchButtons() {
     // Find the username for this post
     // For reposts, there are TWO profile links: the reposter and the original poster
     // We need to find the link closest to the time element (the original poster)
-    let profileLink = null;
-    let username = null;
-
-    // First, try to find a profile link that's an ancestor of the time element
-    // (i.e., the time element is inside a link to the post, which contains the username)
-    const parentLink = timeEl.closest('a[href^="/@"]');
-    if (parentLink) {
-      const href = parentLink.getAttribute('href');
-      // Match username links (with optional query params/hash), but not post links
-      const match = href.match(/^\/@([\w.]+)(?:[?#]|$)/);
-      if (match) {
-        username = match[1];
-        profileLink = parentLink;
-      }
-    }
-
-    // If not found, traverse up to find a nearby username link in the DOM tree
-    // This handles reposts where the original poster's link is near the time element
+    let { username } = findUsernameFromTimeElement(timeEl);
     if (!username) {
-      let current = timeEl;
-      for (let i = 0; i < 8 && current; i++) {
-        current = current.parentElement;
-        if (!current) break;
+      // Fallback: use the first link in the container (old behavior)
+      const fallbackLink = postContainer.querySelector('a[href^="/@"]');
+      if (!fallbackLink) return;
 
-        // Look for a username-only link within this level
-        const usernameLinks = current.querySelectorAll('a[href^="/@"]');
-        for (const link of usernameLinks) {
-          const href = link.getAttribute('href');
-          // Match username links (with optional query params/hash), but not post links
-          const match = href.match(/^\/@([\w.]+)(?:[?#]|$)/);
-          if (match) {
-            username = match[1];
-            profileLink = link;
-            break;
-          }
-        }
-        if (username) break;
-      }
-    }
-
-    // Fallback: if still not found, use the first link (old behavior)
-    if (!username) {
-      profileLink = postContainer.querySelector('a[href^="/@"]');
-      if (!profileLink) return;
-
-      const href = profileLink.getAttribute('href');
+      const href = fallbackLink.getAttribute('href');
       // Match username links (with optional query params/hash), but not post links
       const match = href.match(/^\/@([\w.]+)(?:[?#]|$)/);
       if (!match) return;

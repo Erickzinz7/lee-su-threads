@@ -235,3 +235,54 @@ export function findFollowButtonContainer(container) {
 
   return null;
 }
+
+/**
+ * Find the username associated with a time element in a post
+ * Handles complex cases like reposts where multiple usernames exist
+ *
+ * @param {HTMLElement} timeEl - The time element to find username for
+ * @returns {{username: string|null, profileLink: HTMLElement|null}} - Username and link element
+ */
+export function findUsernameFromTimeElement(timeEl) {
+  let profileLink = null;
+  let username = null;
+
+  // First, try to find a profile link that's an ancestor of the time element
+  // (i.e., the time element is inside a link to the post, which contains the username)
+  const parentLink = timeEl.closest('a[href^="/@"]');
+  if (parentLink) {
+    const href = parentLink.getAttribute('href');
+    // Match username links (with optional query params/hash), but not post links
+    const match = href.match(/^\/@([\w.]+)(?:[?#]|$)/);
+    if (match) {
+      username = match[1];
+      profileLink = parentLink;
+    }
+  }
+
+  // If not found, traverse up to find a nearby username link in the DOM tree
+  // This handles reposts where the original poster's link is near the time element
+  if (!username) {
+    let current = timeEl;
+    for (let i = 0; i < 8 && current; i++) {
+      current = current.parentElement;
+      if (!current) break;
+
+      // Look for a username-only link within this level
+      const usernameLinks = current.querySelectorAll('a[href^="/@"]');
+      for (const link of usernameLinks) {
+        const href = link.getAttribute('href');
+        // Match username links (with optional query params/hash), but not post links
+        const match = href.match(/^\/@([\w.]+)(?:[?#]|$)/);
+        if (match) {
+          username = match[1];
+          profileLink = link;
+          break;
+        }
+      }
+      if (username) break;
+    }
+  }
+
+  return { username, profileLink };
+}
